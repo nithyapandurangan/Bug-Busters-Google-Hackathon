@@ -1,10 +1,10 @@
 import { motion } from 'framer-motion'
 import { useStateValue } from '../../context/StateProvider';
 import { useState } from 'react';
-import { useNavigate } from "react-router-dom"; 
+import { useNavigate } from "react-router-dom";
 import { toast } from 'react-toastify';
 import EligibilityModal from './EligibilityModal';
-
+ 
 // Type definitions
 export interface EligibilityItem {
   id: number;
@@ -16,56 +16,65 @@ export interface EligibilityItem {
   isEligible: boolean;
   reason: string;
 }
-
+ 
 export interface EligibilitySummary {
   totalItems: number;
   eligible: number;
   notEligible: number;
 }
-
+ 
 export interface EligibilityResponse {
   success: boolean;
   timestamp: string;
   summary: EligibilitySummary;
   items: EligibilityItem[];
 }
-
+ 
 interface CartTotalProps {
   checkoutState: (state: boolean) => void;
   items: any[];
 }
-
+ 
 const CartTotal = ({ checkoutState, items }: CartTotalProps) => {
   const [{ cartTotal, user }, dispatch] = useStateValue();
   const [showEligibilityModal, setShowEligibilityModal] = useState<boolean>(false);
   const [eligibilityResults, setEligibilityResults] = useState<EligibilityResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [showErrorModal, setShowErrorModal] = useState<boolean>(false);
-  const navigate = useNavigate(); 
+  const navigate = useNavigate();
+
+  // Check for weekend at the top level for the button style
+  const today = new Date().getDay(); // Sunday = 0, Saturday = 6
+  const isWeekend = today === 0 || today === 6;
+ 
+// // Calculate remaining voucher amount
+//   const voucherLimit = 25;
+//   const remainingVoucherAmount = voucherLimit - (cartTotal || 0);
    
   const checkEligibility = async (): Promise<void> => {
     setLoading(true);
-    
+   
     try {
-        const response = await fetch('http://localhost:3001/api/check-eligibility', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(items)
-        });
-
+      const response = await fetch('https://asia-south1-level-ruler-472607-s6.cloudfunctions.net/mealvoucher/api/check-eligibility', {
+          method: 'POST',
+          headers: {
+              'Content-Type': 'application/json',
+              'x-api-key':'ABCDEFGHI'
+          },
+          body: JSON.stringify(items)
+      });
+ 
         if (!response.ok) {
             const errorData = await response.json();
             throw new Error(errorData.message || 'Failed to check eligibility');
         }
-
+ 
         const data: EligibilityResponse = await response.json();
         console.log("data", data);
-        
+       
         setEligibilityResults(data);
         setShowEligibilityModal(true);
-        
+       
     } catch (err) {
         console.error('Error checking eligibility:', err);
         toast.error('Error checking eligibility. Please try again.');
@@ -73,7 +82,7 @@ const CartTotal = ({ checkoutState, items }: CartTotalProps) => {
         setLoading(false);
     }
   };
-
+ 
   const handleStandardCheckout = () => {
     dispatch({
       type: 'SET_ELIGIBILITY_DATA',
@@ -83,33 +92,70 @@ const CartTotal = ({ checkoutState, items }: CartTotalProps) => {
     });
     checkoutState(true);
   };
-
+ 
   const handleVoucherCheckout = () => {
     // Check if cart total exceeds €25 limit
-    if (cartTotal > 25) {
+    if (cartTotal < 25) {
       setShowErrorModal(true);
       return;
     }
-    // If under limit, proceed with eligibility check
-    toast.info("Checking eligible items for meal voucher payment...");
-    checkEligibility();
-  };
-
+ 
+  // Set initial payment mode to voucher (will be confirmed after eligibility)
+  dispatch({
+    type: 'SET_ELIGIBILITY_DATA',
+    paymentMode: 'voucher',
+    voucherAmount: cartTotal - 25, // Amount after subtracting €25 voucher
+    remainingAmount: cartTotal - 25
+  });
+ 
+  // Proceed with eligibility check
+  toast.info("Checking eligible items for meal voucher payment...");
+  checkEligibility();
+};
+  //   // If under limit, proceed with eligibility check
+  //   toast.info("Checking eligible items for meal voucher payment...");
+  //   checkEligibility();
+  // };
+ 
   const attemptVoucherCheckout = () => {
+        const toastId = toast.loading("Verifying day of the week...");
+        setTimeout(() => {
+      const daysOfWeek = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+      const dayName = daysOfWeek[today];
+
+      if (isWeekend) {
+        toast.update(toastId, { 
+          render: `Vouchers are not valid on ${dayName}.`, 
+          type: "error", 
+          isLoading: false, 
+          autoClose: 5000 
+        });
+        return;
+      }
+      
+      // If it's a weekday, show the success message
+      toast.update(toastId, { 
+        render: `It's ${dayName}, your voucher is valid!`, 
+        type: "success", 
+        isLoading: false, 
+        autoClose: 3000 
+      }); 
+    
     if (user && user.mealVoucherDetails && user.mealVoucherDetails.cardNumber) {
       handleVoucherCheckout();
     } else {
       toast.error("Please add your Meal Voucher details in your profile first!");
-      navigate('/profile'); 
+      navigate('/profile');
     }
+  }, 1000); 
   };
-
+ 
   // Error Modal for the "Over Limit" Component
   const ErrorModal = () => {
        if (!showErrorModal) return null;
     return (
       <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[99999] p-4">
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
           className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-6"
@@ -158,7 +204,7 @@ const CartTotal = ({ checkoutState, items }: CartTotalProps) => {
           <p className="text-gray-50 text-base md:text-lg">-</p>
           <p className="text-gray-50 text-base md:text-lg "><span className="text-sm text-red-600">€</span> {cartTotal}</p>
         </div>
-
+ 
         {/* Enhanced Payment Buttons with WGS Theme */}
         <motion.button
           onClick={attemptVoucherCheckout}
@@ -178,10 +224,11 @@ const CartTotal = ({ checkoutState, items }: CartTotalProps) => {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
               </svg>
               <span>Pay with Meal Voucher</span>
+             
             </>
           )}
         </motion.button>
-
+ 
         <motion.button
           onClick={handleStandardCheckout}
           whileHover={{ scale: 1.02 }}
@@ -194,10 +241,10 @@ const CartTotal = ({ checkoutState, items }: CartTotalProps) => {
           <span>Pay with Card / Other</span>
         </motion.button>
       </div>
-
+ 
       {/* Modals */}
       <ErrorModal />
-      <EligibilityModal 
+      <EligibilityModal
         show={showEligibilityModal}
         onClose={() => setShowEligibilityModal(false)}
         eligibilityResults={eligibilityResults}
@@ -206,5 +253,6 @@ const CartTotal = ({ checkoutState, items }: CartTotalProps) => {
     </>
   )
 }
-
+ 
 export default CartTotal
+ 
