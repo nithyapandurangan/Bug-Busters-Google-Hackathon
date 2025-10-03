@@ -135,7 +135,7 @@ const CartTotal = ({ checkoutState, items }: CartTotalProps) => {
       
       // If it's a weekday, show the success message
       toast.update(toastId, { 
-        render: `It's ${dayName}, your voucher is valid!`, 
+        // render: `It's ${dayName}, your voucher is valid!`, 
         type: "success", 
         isLoading: false, 
         autoClose: 3000 

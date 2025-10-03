@@ -12,7 +12,9 @@ const Menu = ({ title }: { title?: string }) => {
   const [filter, setFilter] = useState<string>("all");
 
   // Get filtered items using your existing FilterFood function
-  const filteredItems = filter === "all" ? foodItems : FilterFood(filter);
+   const filteredItems = foodItems 
+    ? (filter === "all" ? foodItems : FilterFood(foodItems, filter))
+    : [];
 
   return (
     <section className="w-full py-16" id="menu">

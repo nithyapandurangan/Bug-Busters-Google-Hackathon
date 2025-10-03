@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import { FoodItem, cartItem } from "../../types";
+import { FoodItem, cartItem, User } from "../../types";
 import {
   firebaseAddToCart,
   firebaseDeleteCartItem,
@@ -20,42 +20,37 @@ import { toast } from "react-toastify";
 export const addToCart = async (
   cartItems: cartItem[],
   foodItems: FoodItem[],
-  user: any,
+  user: User,
   fid: number,
   dispatch: any
 ) => {
   if (!user) {
-    toast.error("Please login to add items to cart", {
-      icon: <MdShoppingBasket className="text-2xl text-cartNumBg" />,
-      toastId: "unauthorizedAddToCart",
-    });
+    toast.error("Please login to add items to cart");
   } else {
-    if (cartItems.some((item: cartItem) => item["fid"] === fid)) {
-      toast.error("Item already in cart", {
-        icon: <MdShoppingBasket className="text-2xl text-cartNumBg" />,
-        toastId: "itemAlreadyInCart",
-      });
+    if (cartItems.some((item: cartItem) => item.fid === fid)) {
+      toast.error("Item already in cart");
     } else {
-      const item = foodItems.find((item: any) => item.id === fid); 
-      const data: cartItem = {
-        id: Date.now(),
+      const itemDetails = foodItems.find((item: FoodItem) => item.id === fid); 
+      const data = { // Note: We don't need a client-side ID here anymore
         fid: fid,
         uid: user.uid,
-        // uid : 'test',
         qty: 1,
-        itemname : item?.title || "",
-        itemcategory : item?.category || ""
-
+        itemname : itemDetails?.title || "",
+        itemcategory : itemDetails?.category || ""
       };
-      dispatch({
-        type: "SET_CARTITEMS",
-        cartItems: [...cartItems, data],
-      });
-      calculateCartTotal(cartItems, foodItems, dispatch);
-      await firebaseAddToCart(data);
+      
+      try {
+    await firebaseAddToCart(data);
+    // After a successful add, re-fetch all cart data to ensure the
+    // local state is in sync with the database, including the correct Firestore ID.
+    await fetchUserCartData(user, dispatch);
+  } catch (error) {
+    console.error("Failed to add item to cart:", error);
+  }
     }
   }
 };
+
 export const dispatchtUserCartItems = (
   uid: string,
   items: cartItem[],
@@ -160,21 +155,21 @@ export const deleteCartItem = async (
   item: cartItem,
   dispatch: any
 ) => {
-  const index = cartItems.findIndex(
-    (cartItem: cartItem) => cartItem.id === item.id
-  );
-  if (index !== -1) {
-    cartItems.splice(index, 1);
+  try {
+    await firebaseDeleteCartItem(item);
+
+    const newCartItems = cartItems.filter(cartItem => cartItem.id !== item.id);
+    
     dispatch({
       type: "SET_CARTITEMS",
-      cartItems: cartItems,
+      cartItems: newCartItems,
     });
-    calculateCartTotal(cartItems, foodItems, dispatch);
-    await firebaseDeleteCartItem(item)
-      .then(() => {})
-      .catch((e) => {
-        console.log(e);
-      });
+
+    calculateCartTotal(newCartItems, foodItems, dispatch);
+    
+  } catch (e) {
+    console.error("Error removing item:", e);
+    toast.error("Failed to remove item. Please try again.");
   }
 };
 
@@ -195,27 +190,40 @@ export const calculateCartTotal = (
   });
 };
 
-// Empty Cart
 export const emptyCart = async (
   cartItems: cartItem[],
   foodItems: FoodItem[],
   dispatch: any
 ) => {
-  if (cartItems.length > 0) {
+  // First, check if the cart has items.
+  if (!cartItems || cartItems.length === 0) {
+    toast.warn("Cart is already empty");
+    return;
+  }
+
+  try {
+    // 1. Await the Firebase operation to complete successfully.
+    await firebaseEmptyUserCart(cartItems);
+
+    // 2. If successful, now update the local state to match.
     dispatch({
-      type: "SET_CARTITEMS",
+      type: "SET_CARTITEMS", 
       cartItems: [],
     });
-    calculateCartTotal(cartItems, foodItems, dispatch);
-    await firebaseEmptyUserCart(cartItems)
-      .then(() => {})
-      .catch((e) => {
-        console.log(e);
-      });
-  } else {
-    toast.warn("Cart is already empty");
+    
+    // 3. Recalculate the total with an empty array to set it to 0.
+    calculateCartTotal([], foodItems, dispatch);
+
+    toast.success("Cart cleared successfully!");
+
+  } catch (e) {
+    // 4. If the Firebase operation fails, log the error and notify the user.
+    // The local state is NOT changed, so the cart items remain visible.
+    console.error("Error clearing cart from Firebase:", e);
+    toast.error("Failed to clear cart. Please try again.");
   }
 };
+
 
 // Hide Cart
 export const hideCart = (dispatch: any) => {

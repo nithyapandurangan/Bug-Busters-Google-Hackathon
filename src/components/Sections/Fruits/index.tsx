@@ -3,11 +3,13 @@ import Container from "../../Container"
 import { FilterFood } from "../../../utils/filters"
 import { useState } from "react"
 import { motion } from "framer-motion"
+import { useStateValue } from "../../../context/StateProvider";
 
 const Fruits = () => {
-  const fruits = FilterFood("fruits")
-  const [scrollValue, setScrollValue] = useState(0)
+   const [{ foodItems }] = useStateValue();
+  const [scrollValue, setScrollValue] = useState(0);
 
+  const fruits = FilterFood(foodItems, "fruits");
   return (
     <section className="w-full py-10">
       <div className="w-full mx-auto px-4 md:px-8 lg:px-16">

@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { useStateValue } from '../../context/StateProvider';
 import { useState } from 'react';
 import { EligibilityResponse, EligibilityItem } from './CartTotal';
- 
+
 // Define props for this component
 interface EligibilityModalProps {
   show: boolean;
@@ -11,26 +11,26 @@ interface EligibilityModalProps {
   eligibilityResults: EligibilityResponse | null;
   checkoutState: (state: boolean) => void;
 }
- 
+
 const EligibilityModal = ({ show, onClose, eligibilityResults, checkoutState }: EligibilityModalProps) => {
   const [{ cartTotal, foodItems }, dispatch] = useStateValue();
   const [showConfirmationModal, setShowConfirmationModal] = useState<boolean>(false);
- 
+
   if (!show || !eligibilityResults) return null;
- 
+
   // Data Processing
   const eligibleItems = eligibilityResults.items.filter(item => item.isEligible);
   const nonEligibleItems = eligibilityResults.items.filter(item => !item.isEligible);
- 
+
   const dressItems = nonEligibleItems.filter(item => item.itemcategory.toLowerCase() === 'dress');
   const cosmeticsItems = nonEligibleItems.filter(item => item.itemcategory.toLowerCase() === 'cosmetics');
   const otherNonEligibleItems = nonEligibleItems.filter(
     item => item.itemcategory.toLowerCase() !== 'dress' && item.itemcategory.toLowerCase() !== 'cosmetics'
   );
- 
+
   const hasEligibleItems = eligibleItems.length > 0;
   const DAILY_VOUCHER_LIMIT = 25.00;
- 
+
   let eligibleSubtotal = 0;
   eligibleItems.forEach(eligibleItem => {
     const fullItemDetails = foodItems.find((food: { id: number; price: number; }) => food.id === eligibleItem.fid);
@@ -38,47 +38,47 @@ const EligibilityModal = ({ show, onClose, eligibilityResults, checkoutState }: 
       eligibleSubtotal += fullItemDetails.price * eligibleItem.qty;
     }
   });
- 
+
   const amountPayableByVoucher = Math.min(eligibleSubtotal, DAILY_VOUCHER_LIMIT);
   // FIXED: Calculate what user needs to pay after voucher discount
   const userPayAmount = Math.max(eligibleSubtotal - amountPayableByVoucher, 0);
- 
+
   console.log('EligibilityModal calculations:', {
-    eligibleSubtotal: eligibleSubtotal,           // €60.24
+    eligibleSubtotal: eligibleSubtotal,        // €60.24
     amountPayableByVoucher: amountPayableByVoucher, // €25.00
-    userPayAmount: userPayAmount                  // €35.24
+    userPayAmount: userPayAmount              // €35.24
   });
- 
+
   // Event Handlers
   const handleProceedClick = () => {
     if (!hasEligibleItems) return;
     setShowConfirmationModal(true);
   };
- 
+
   // FIXED: Corrected payment calculation
   const handleConfirmPayment = () => {
     console.log('🟢 Confirming voucher payment with calculations:', {
-      eligibleSubtotal: eligibleSubtotal,           // €60.24
+      eligibleSubtotal: eligibleSubtotal,        // €60.24
       amountPayableByVoucher: amountPayableByVoucher, // €25.00  
-      userPayAmount: userPayAmount                  // €35.24
+      userPayAmount: userPayAmount              // €35.24
     });
-   
+    
     dispatch({
       type: 'SET_ELIGIBILITY_DATA',
       paymentMode: 'voucher',
-      voucherAmount: userPayAmount,                 // €35.24 (what USER pays)
-      voucherValue: amountPayableByVoucher,         // €25.00 (what VOUCHER pays)
-      originalTotal: eligibleSubtotal,              // €60.24 (eligible total)
-      remainingAmount: userPayAmount                // €35.24 (same as voucherAmount)
+      voucherAmount: userPayAmount,           // €35.24 (what USER pays)
+      voucherValue: amountPayableByVoucher,       // €25.00 (what VOUCHER pays)
+      originalTotal: eligibleSubtotal,          // €60.24 (eligible total)
+      remainingAmount: userPayAmount          // €35.24 (same as voucherAmount)
     });
-   
+    
     console.log('✅ Dispatched voucher payment data');
-   
+    
     setShowConfirmationModal(false);
     onClose();
     checkoutState(true);
   };
- 
+
   // FIXED: Updated confirmation modal to show correct user amount
   const ConfirmationModal = () => {
     if (!showConfirmationModal) return null;
@@ -94,7 +94,7 @@ const EligibilityModal = ({ show, onClose, eligibilityResults, checkoutState }: 
             <p className="text-sm text-textColor mt-2 mb-4">
               You are about to pay for eligible items only. Non-eligible items will be removed from this order.
             </p>
-           
+            
             {/* Payment Breakdown */}
             <div className="bg-gray-50 rounded-2xl p-4 mb-4 space-y-3">
               <div className="flex justify-between text-sm text-gray-600">
@@ -110,13 +110,13 @@ const EligibilityModal = ({ show, onClose, eligibilityResults, checkoutState }: 
                 <span>€{userPayAmount.toFixed(2)}</span>
               </div>
             </div>
- 
+
             {/* FIXED: Show correct user payment amount */}
             <div className="bg-orange-50 border border-orange-200 rounded-2xl p-4 mb-6">
               <p className="text-sm text-orange-600 font-semibold">Amount to Pay After Voucher</p>
               <p className="text-3xl font-bold text-orange-800">€{userPayAmount.toFixed(2)}</p>
             </div>
-           
+            
             <div className="flex space-x-3">
               <button
                 onClick={() => setShowConfirmationModal(false)}
@@ -136,7 +136,7 @@ const EligibilityModal = ({ show, onClose, eligibilityResults, checkoutState }: 
       </div>
     );
   };
- 
+
   return createPortal(
     <>
       <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[99998] p-4">
@@ -148,7 +148,7 @@ const EligibilityModal = ({ show, onClose, eligibilityResults, checkoutState }: 
         >
           <div className="h-full flex flex-col">
             <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 h-full">
- 
+
               {/* Left Column: Summary & Information */}
               <div className="bg-white p-8 flex flex-col justify-between">
                 <div>
@@ -163,7 +163,7 @@ const EligibilityModal = ({ show, onClose, eligibilityResults, checkoutState }: 
                       <p className="text-textColor text-sm mt-1">Confirm items for your meal voucher</p>
                     </div>
                   </div>
- 
+
                   <div className="space-y-4">
                     <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 text-center">
                       <p className="text-sm text-blue-600 font-semibold">Eligible Items Value</p>
@@ -180,7 +180,7 @@ const EligibilityModal = ({ show, onClose, eligibilityResults, checkoutState }: 
                     </div>
                   </div>
                 </div>
- 
+
                 <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mt-8">
                   <div className="flex items-start space-x-3">
                     <div className="w-6 h-6 bg-amber-500 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -197,9 +197,10 @@ const EligibilityModal = ({ show, onClose, eligibilityResults, checkoutState }: 
                   </div>
                 </div>
               </div>
- 
+
               {/* Right Column: Item Lists */}
-              <div className="p-8 flex flex-col">
+              {/* FIXED: Added overflow-hidden to the parent flex container */}
+              <div className="p-8 flex flex-col overflow-hidden">
                 <div className="flex-1 overflow-y-auto space-y-6">
                   {/* Eligible Items */}
                   <div>
@@ -219,7 +220,7 @@ const EligibilityModal = ({ show, onClose, eligibilityResults, checkoutState }: 
                       )}
                     </div>
                   </div>
-                 
+                  
                   {/* Non-Eligible Items */}
                   <div>
                     <h3 className="text-xl font-bold text-headingColor mb-4">
@@ -257,7 +258,7 @@ const EligibilityModal = ({ show, onClose, eligibilityResults, checkoutState }: 
                           <h4 className="font-semibold text-textColor mb-2 flex items-center gap-2">
                             <span>🛒</span> Other
                           </h4>
-                           {otherNonEligibleItems.map(item => (
+                            {otherNonEligibleItems.map(item => (
                             <div key={item.id} className="bg-white border border-red-200 rounded-lg p-3 mb-2 opacity-70">
                               <p className="font-semibold text-headingColor line-through">{item.itemname}</p>
                               <p className="text-xs text-red-600 font-medium mt-1">{item.reason}</p>
@@ -267,13 +268,13 @@ const EligibilityModal = ({ show, onClose, eligibilityResults, checkoutState }: 
                       )}
                       {nonEligibleItems.length === 0 && (
                          <p className="text-sm text-textColor p-3 bg-gray-100 rounded-lg">
-                          All items in your cart are eligible!
-                        </p>
+                           All items in your cart are eligible!
+                         </p>
                       )}
                     </div>
                   </div>
                 </div>
- 
+
                 {/* Footer Actions */}
                 <div className="pt-6 border-t border-gray-200 mt-6 flex items-center justify-end space-x-4">
                   <motion.button
@@ -302,5 +303,5 @@ const EligibilityModal = ({ show, onClose, eligibilityResults, checkoutState }: 
     document.body
   );
 };
- 
+
 export default EligibilityModal;
